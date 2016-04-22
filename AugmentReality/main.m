@@ -251,3 +251,91 @@ for i = 1 : 4
     % compute improved error
     err_reprojection(:,i) = (p_projected(1,:,i) - p_correct(1,:,i))*(p_projected(1,:,i) - p_correct(1,:,i))' + (p_projected(2,:,i) - p_correct(2,:,i))*(p_projected(2,:,i) - p_correct(2,:,i))';
 end
+
+%% -------------------------------------------------------------------
+%                               Part 3
+%-------------------------------------------------------------------
+%------------------ Augmenting an Image ----------------
+% get world coordinates of the clip art image  
+I0 = rgb2gray(imread('1.jpg'));
+I1 = imread('1.gif');
+figure;
+imshow(I0);
+figure;
+imshow(I1);
+
+[c,r,~] = size(I0);
+d = 0.21/(c-1)/2;
+X_1 = zeros(3,c*r);
+X_0 = zeros(2,c*r);
+for i = 1 : c
+    for j = 1 : r
+        X_0(1,(i-1)*r+j) = j;
+        X_1(1,(i-1)*r+j) = d*(j-1);
+        X_0(2,(i-1)*r+j) = i;
+        X_1(2,(i-1)*r+j) = d*(i-1);
+        X_1(3,(i-1)*r+j) = 1;
+    end
+end
+
+%----------- transfer to image coordinates
+I0_projected = ones(480,640,4)*255; 
+for i = 1 : 4
+    % transfer
+    X_2(:,:,i) = H_new(:,:,i) * X_1;
+    X_2(:,:,i) = X_2(:,:,i)./[X_2(3,:,i);X_2(3,:,i);X_2(3,:,i)];
+    X_2(:,:,i) = uint16(X_2(:,:,i));
+    for j = 1 : r * c
+        if (I0(c-X_0(2,j)+1,X_0(1,j)) < 255)
+            I0_projected(X_2(2,j,i),X_2(1,j,i),i) = I0(c-X_0(2,j)+1,X_0(1,j));
+        end
+    end  
+end
+% print projected images
+figure;
+for k = 1 : 4
+    % I0_projected(:,:,k) = imerode(I0_projected(:,:,k),ones(3,3));
+    B = double(eval(['I',int2str(k),'(:,:,3)']));
+    G = double(eval(['I',int2str(k),'(:,:,2)']));
+    R = double(eval(['I',int2str(k),'(:,:,1)']));
+    for i = 1 : 480
+        for j = 1 : 640
+            if (I0_projected(i,j,k)<255)
+                B(i,j) = I0_projected(i,j,k);
+                G(i,j) = I0_projected(i,j,k);
+                R(i,j) = I0_projected(i,j,k);
+            end
+        end
+    end
+    B = medfilt2(B);
+    G = medfilt2(G);
+    R = medfilt2(R);
+    I_projected = uint8(cat(3,R,G,B));   
+    subplot(2,2,k);
+    imshow(I_projected); 
+    title(['Figure4:Augmenting image ',int2str(k)]);
+end
+% ----------- Augmenting an Object ----------------
+% world coordinates of cube
+X1_cube = [0, 0.09, 0.09, 0,    0,    0.09, 0.09, 0;
+           0, 0,    0.09, 0.09, 0,    0,    0.09, 0.09;
+           0, 0,    0,    0,    0.09, 0.09, 0.09, 0.09;
+           1, 1,    1,    1,    1,    1,    1,    1];
+% transfer and print
+X2_cube = zeros(3,8,4);
+H_cube = zeros(3,4,4);
+figure;
+for i = 1 : 4
+    H_cube(:,:,i) = A_new * [R_new(:,:,i),t_new(:,i)];
+    X2_cube(:,:,i) = H_cube(:,:,i) * X1_cube;
+    X2_cube(:,:,i) = X2_cube(:,:,i)./[X2_cube(3,:,i);X2_cube(3,:,i);X2_cube(3,:,i)];
+    subplot(2,2,i); imshow(eval(['I',int2str(i)])); 
+    hold on;
+    c = X2_cube(2,:,i);
+    r = X2_cube(1,:,i);
+    plot([r(1:4),r(1),r(5:8),r(5)],[c(1:4),c(1),c(5:8),c(5)],'go-');
+    plot([r(2),r(6)],[c(2),c(6)],'go-');
+    plot([r(3),r(7)],[c(3),c(7)],'go-');
+    plot([r(4),r(8)],[c(4),c(8)],'go-');
+    title(['Figure5:Augmenting object',int2str(i)]);
+end
